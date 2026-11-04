@@ -1,0 +1,53 @@
+name: Build Native Android Studio APK (Gradle & Media3)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'android/**'
+
+jobs:
+  build-native-apk:
+    name: Build Native Android APK with Gradle
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Cache Gradle Packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Assemble Debug APK
+        run: |
+          if [ -d "android" ]; then
+            cd android
+            chmod +x gradlew || true
+            ./gradlew assembleDebug --stacktrace
+          else
+            echo "Native Android directory not detected. Run build-apk.yml workflow for WebAPK/TWA build."
+          fi
+
+      - name: Upload Native APK Artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lumigrad-native-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          retention-days: 14

@@ -1,0 +1,6 @@
+{
+  "name": "LumiGrad HDR10+ Studio",
+  "description": "Professional Android app & PWA to convert SDR video to HDR10+ BT.2020 colour space with 3D LUT grading, dynamic tone mapping, and multi-resolution video export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
