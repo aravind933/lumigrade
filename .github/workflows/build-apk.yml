@@ -36,6 +36,16 @@ jobs:
       - name: Install Bubblewrap CLI
         run: npm install -g @bubblewrap/cli
 
+      - name: Preconfigure Bubblewrap CLI Config (Non-Interactive CI)
+        run: |
+          mkdir -p ~/.bubblewrap
+          cat <<EOF > ~/.bubblewrap/config.json
+          {
+            "jdkPath": "${JAVA_HOME}",
+            "androidSdkPath": "${ANDROID_HOME}"
+          }
+          EOF
+
       - name: Build Android APK
         env:
           APP_MANIFEST_URL: "https://ais-pre-rgksvfpod2mfbwcjuyrunh-996638534918.asia-east1.run.app/manifest.webmanifest"
@@ -43,8 +53,12 @@ jobs:
           mkdir -p twa-build
           cd twa-build
 
-          echo "Initializing Bubblewrap project from live manifest..."
-          bubblewrap init --manifest="$APP_MANIFEST_URL" --skipPwaValidation --signing.keyPassword="password123" --signing.storePassword="password123"
+          echo "Initializing Bubblewrap project from live manifest non-interactively..."
+          yes "" | bubblewrap init \
+            --manifest="$APP_MANIFEST_URL" \
+            --skipPwaValidation \
+            --signing.keyPassword="password123" \
+            --signing.storePassword="password123" || true
 
           echo "Building APK..."
           bubblewrap build --skipSigning=false
