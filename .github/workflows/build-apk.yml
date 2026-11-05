@@ -27,7 +27,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Configure Pre-installed Android SDK & Accept Licenses
+      - name: Configure Android SDK & Accept Licenses
         run: |
           echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
           echo "$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
@@ -37,7 +37,7 @@ jobs:
       - name: Install Bubblewrap CLI
         run: npm install -g @bubblewrap/cli
 
-      - name: Preconfigure Bubblewrap CLI Config (Explicit Paths)
+      - name: Preconfigure Bubblewrap CLI Config
         run: |
           mkdir -p ~/.bubblewrap
           cat <<EOF > ~/.bubblewrap/config.json
@@ -46,46 +46,34 @@ jobs:
             "androidSdkPath": "${ANDROID_HOME}"
           }
           EOF
-          echo "=== Bubblewrap Config ==="
-          cat ~/.bubblewrap/config.json
-          echo "=== Verifying Paths ==="
-          test -d "$JAVA_HOME" && echo "JAVA_HOME exists: $JAVA_HOME"
-          test -d "$ANDROID_HOME" && echo "ANDROID_HOME exists: $ANDROID_HOME"
           bubblewrap doctor || true
 
-      - name: Build Android APK from Local Project Manifest
+      - name: Generate Android Keystore
         run: |
-          # 1. Create temporary local server to serve static public/manifest.json and icons
-          npx serve public -l 8080 &
-          SERVE_PID=$!
-          sleep 2
+          keytool -genkeypair -v \
+            -keystore android.keystore \
+            -alias android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass password123 \
+            -keypass password123 \
+            -dname "CN=LumiGrad, OU=Engineering, O=LumiGrad, L=Mountain View, ST=CA, C=US"
 
-          # Verify local manifest endpoint returns valid JSON
-          curl -s http://127.0.0.1:8080/manifest.json | grep -i "LumiGrad" || { echo "Manifest serve failed"; exit 1; }
-
-          mkdir -p twa-build
-          cd twa-build
-
-          echo "Initializing Bubblewrap project with local manifest..."
-          bubblewrap init \
-            --manifest="http://127.0.0.1:8080/manifest.json" \
-            --skipPwaValidation \
+      - name: Build Android APK from twa-manifest.json
+        run: |
+          echo "=== Building APK non-interactively using committed twa-manifest.json ==="
+          bubblewrap build \
+            --skipVersionUpgrade \
+            --signingKeyPath=./android.keystore \
+            --signingKeyAlias=android \
             --signing.keyPassword="password123" \
             --signing.storePassword="password123"
-
-          echo "Updating host to live production URL in twa-manifest.json..."
-          sed -i 's|127.0.0.1:8080|ais-pre-rgksvfpod2mfbwcjuyrunh-996638534918.asia-east1.run.app|g' twa-manifest.json || true
-          sed -i 's|http://|https://|g' twa-manifest.json || true
-
-          echo "Building signed release APK..."
-          bubblewrap build --skipSigning=false
-
-          kill $SERVE_PID || true
 
       - name: Find & Stage Generated APK
         run: |
           mkdir -p output-apk
-          find twa-build -type f -name "*.apk" -exec cp {} output-apk/ \;
+          find . -maxdepth 2 -type f -name "*.apk" -exec cp {} output-apk/ \;
           ls -lah output-apk/
 
       - name: Upload APK as Workflow Artifact
