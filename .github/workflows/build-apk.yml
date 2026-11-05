@@ -27,7 +27,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Configure Android SDK & Fix Bubblewrap tools/bin layout
+      - name: Configure Android SDK & Fix Bubblewrap tools layout
         run: |
           echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
           echo "$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
@@ -36,14 +36,9 @@ jobs:
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
-          # Create tools compatibility folder expected by Bubblewrap validator
-          if [ ! -d "$ANDROID_HOME/tools" ]; then
-            echo "Creating tools compatibility directory for Bubblewrap..."
-            mkdir -p "$ANDROID_HOME/tools"
-            cp -r "$ANDROID_HOME/cmdline-tools/latest/"* "$ANDROID_HOME/tools/" || true
-          fi
-          
-          echo "Verifying tools/bin/sdkmanager exists:"
+          # Populate tools folder for Bubblewrap validation
+          mkdir -p "$ANDROID_HOME/tools"
+          cp -r "$ANDROID_HOME/cmdline-tools/latest/"* "$ANDROID_HOME/tools/" || true
           ls -lah "$ANDROID_HOME/tools/bin/sdkmanager"
 
       - name: Install Bubblewrap CLI
@@ -58,7 +53,6 @@ jobs:
             "androidSdkPath": "${ANDROID_HOME}"
           }
           EOF
-          echo "=== Running Bubblewrap Doctor ==="
           bubblewrap doctor
 
       - name: Generate Android Keystore
@@ -75,8 +69,12 @@ jobs:
 
       - name: Build Android APK from twa-manifest.json
         run: |
-          echo "=== Building APK non-interactively using twa-manifest.json ==="
-          bubblewrap build \
+          echo "=== Pre-generating manifest-checksum.txt to prevent interactive regenerate prompt ==="
+          sha256sum twa-manifest.json | awk '{print $1}' > manifest-checksum.txt
+          cat manifest-checksum.txt
+
+          echo "=== Building APK non-interactively ==="
+          printf "no\n" | bubblewrap build \
             --skipVersionUpgrade \
             --signingKeyPath=./android.keystore \
             --signingKeyAlias=android \
