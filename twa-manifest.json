@@ -1,0 +1,36 @@
+{
+  "packageId": "com.lumigrad.hdrstudio",
+  "host": "ais-pre-rgksvfpod2mfbwcjuyrunh-996638534918.asia-east1.run.app",
+  "name": "LumiGrad HDR10+ Studio",
+  "launcherName": "LumiGrad",
+  "display": "standalone",
+  "themeColor": "#090a0f",
+  "navigationColor": "#090a0f",
+  "navigationColorDark": "#090a0f",
+  "navigationDividerColor": "#090a0f",
+  "navigationDividerColorDark": "#090a0f",
+  "backgroundColor": "#090a0f",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://ais-pre-rgksvfpod2mfbwcjuyrunh-996638534918.asia-east1.run.app/icon.svg",
+  "maskableIconUrl": "https://ais-pre-rgksvfpod2mfbwcjuyrunh-996638534918.asia-east1.run.app/icon.svg",
+  "appVersionCode": 1,
+  "appVersionName": "1.0.0",
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://ais-pre-rgksvfpod2mfbwcjuyrunh-996638534918.asia-east1.run.app/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "minSdkVersion": 21,
+  "orientation": "default",
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "android"
+  }
+}
