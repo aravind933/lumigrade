@@ -9,7 +9,7 @@ on:
 
 jobs:
   build-apk:
-    name: Build Signed Android APK (Bubblewrap TWA)
+    name: Build Signed Android APK
     runs-on: ubuntu-latest
 
     steps:
@@ -27,13 +27,16 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Configure Pre-installed Android SDK & Accept Licenses
+        run: |
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
       - name: Install Bubblewrap CLI
         run: npm install -g @bubblewrap/cli
 
-      - name: Initialize & Build Bubblewrap Android APK
+      - name: Build Android APK
         env:
           APP_MANIFEST_URL: "https://ais-pre-rgksvfpod2mfbwcjuyrunh-996638534918.asia-east1.run.app/manifest.webmanifest"
         run: |
@@ -41,16 +44,22 @@ jobs:
           cd twa-build
 
           echo "Initializing Bubblewrap project from live manifest..."
-          bubblewrap init --manifest="$APP_MANIFEST_URL" --skipPwaValidation
+          bubblewrap init --manifest="$APP_MANIFEST_URL" --skipPwaValidation --signing.keyPassword="password123" --signing.storePassword="password123"
 
-          echo "Building Android APK..."
-          bubblewrap build
+          echo "Building APK..."
+          bubblewrap build --skipSigning=false
+
+      - name: Find & Stage Generated APK
+        run: |
+          mkdir -p output-apk
+          find twa-build -type f -name "*.apk" -exec cp {} output-apk/ \;
+          ls -lah output-apk/
 
       - name: Upload APK as Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
           name: lumigrad-hdr-studio-apk
-          path: twa-build/*.apk
+          path: output-apk/*.apk
           retention-days: 14
 
       - name: Create GitHub Release (on main branch push)
@@ -59,7 +68,7 @@ jobs:
         with:
           tag_name: v1.0.${{ github.run_number }}
           name: LumiGrad HDR10+ Studio v1.0.${{ github.run_number }}
-          files: twa-build/*.apk
+          files: output-apk/*.apk
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
