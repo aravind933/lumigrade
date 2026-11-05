@@ -1,0 +1,107 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    name: Build Signed Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Configure Pre-installed Android SDK & Accept Licenses
+        run: |
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Install Bubblewrap CLI
+        run: npm install -g @bubblewrap/cli
+
+      - name: Preconfigure Bubblewrap CLI Config (Explicit Paths)
+        run: |
+          mkdir -p ~/.bubblewrap
+          cat <<EOF > ~/.bubblewrap/config.json
+          {
+            "jdkPath": "${JAVA_HOME}",
+            "androidSdkPath": "${ANDROID_HOME}"
+          }
+          EOF
+          echo "=== Bubblewrap Config ==="
+          cat ~/.bubblewrap/config.json
+          echo "=== Verifying Paths ==="
+          test -d "$JAVA_HOME" && echo "JAVA_HOME exists: $JAVA_HOME"
+          test -d "$ANDROID_HOME" && echo "ANDROID_HOME exists: $ANDROID_HOME"
+          bubblewrap doctor || true
+
+      - name: Build Android APK from Local Project Manifest
+        run: |
+          # 1. Create temporary local server to serve static public/manifest.json and icons
+          npx serve public -l 8080 &
+          SERVE_PID=$!
+          sleep 2
+
+          # Verify local manifest endpoint returns valid JSON
+          curl -s http://127.0.0.1:8080/manifest.json | grep -i "LumiGrad" || { echo "Manifest serve failed"; exit 1; }
+
+          mkdir -p twa-build
+          cd twa-build
+
+          echo "Initializing Bubblewrap project with local manifest..."
+          bubblewrap init \
+            --manifest="http://127.0.0.1:8080/manifest.json" \
+            --skipPwaValidation \
+            --signing.keyPassword="password123" \
+            --signing.storePassword="password123"
+
+          echo "Updating host to live production URL in twa-manifest.json..."
+          sed -i 's|127.0.0.1:8080|ais-pre-rgksvfpod2mfbwcjuyrunh-996638534918.asia-east1.run.app|g' twa-manifest.json || true
+          sed -i 's|http://|https://|g' twa-manifest.json || true
+
+          echo "Building signed release APK..."
+          bubblewrap build --skipSigning=false
+
+          kill $SERVE_PID || true
+
+      - name: Find & Stage Generated APK
+        run: |
+          mkdir -p output-apk
+          find twa-build -type f -name "*.apk" -exec cp {} output-apk/ \;
+          ls -lah output-apk/
+
+      - name: Upload APK as Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lumigrad-hdr-studio-apk
+          path: output-apk/*.apk
+          retention-days: 14
+
+      - name: Create GitHub Release (on main branch push)
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: LumiGrad HDR10+ Studio v1.0.${{ github.run_number }}
+          files: output-apk/*.apk
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
