@@ -68,18 +68,19 @@ jobs:
             -dname "CN=LumiGrad, OU=Engineering, O=LumiGrad, L=Mountain View, ST=CA, C=US"
 
       - name: Build Android APK from twa-manifest.json
+        env:
+          BUBBLEWRAP_KEYSTORE_PASSWORD: "password123"
+          BUBBLEWRAP_KEY_PASSWORD: "password123"
         run: |
-          echo "=== Pre-generating manifest-checksum.txt to prevent interactive regenerate prompt ==="
+          echo "=== Pre-generating manifest-checksum.txt ==="
           sha256sum twa-manifest.json | awk '{print $1}' > manifest-checksum.txt
           cat manifest-checksum.txt
 
-          echo "=== Building APK non-interactively ==="
-          printf "no\n" | bubblewrap build \
+          echo "=== Building APK headlessly with BUBBLEWRAP_KEYSTORE_PASSWORD ==="
+          bubblewrap build \
             --skipVersionUpgrade \
             --signingKeyPath=./android.keystore \
-            --signingKeyAlias=android \
-            --signing.keyPassword="password123" \
-            --signing.storePassword="password123"
+            --signingKeyAlias=android
 
       - name: Find & Stage Generated APK
         run: |
