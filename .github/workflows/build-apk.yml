@@ -27,12 +27,24 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Configure Android SDK & Accept Licenses
+      - name: Configure Android SDK & Fix Bubblewrap tools/bin layout
         run: |
           echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
           echo "$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+          
+          # Accept licenses & ensure build-tools are present
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+          # Create tools compatibility folder expected by Bubblewrap validator
+          if [ ! -d "$ANDROID_HOME/tools" ]; then
+            echo "Creating tools compatibility directory for Bubblewrap..."
+            mkdir -p "$ANDROID_HOME/tools"
+            cp -r "$ANDROID_HOME/cmdline-tools/latest/"* "$ANDROID_HOME/tools/" || true
+          fi
+          
+          echo "Verifying tools/bin/sdkmanager exists:"
+          ls -lah "$ANDROID_HOME/tools/bin/sdkmanager"
 
       - name: Install Bubblewrap CLI
         run: npm install -g @bubblewrap/cli
@@ -46,7 +58,8 @@ jobs:
             "androidSdkPath": "${ANDROID_HOME}"
           }
           EOF
-          bubblewrap doctor || true
+          echo "=== Running Bubblewrap Doctor ==="
+          bubblewrap doctor
 
       - name: Generate Android Keystore
         run: |
@@ -62,7 +75,7 @@ jobs:
 
       - name: Build Android APK from twa-manifest.json
         run: |
-          echo "=== Building APK non-interactively using committed twa-manifest.json ==="
+          echo "=== Building APK non-interactively using twa-manifest.json ==="
           bubblewrap build \
             --skipVersionUpgrade \
             --signingKeyPath=./android.keystore \
